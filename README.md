@@ -20,6 +20,7 @@ npx portlease 3000             # one-off, no install
 ```sh
 portlease 3000                 # prints a leased port at or above 3000
 portlease 3000 --cwd /path     # key the lease to another directory
+portlease 3000 --name web      # distinct lease for "web" within the same directory
 portlease --prune              # drop leases for directories that no longer exist
 ```
 
@@ -46,6 +47,8 @@ const { leasePort } = require("portlease");
 
 const port = await leasePort(3000);                 // keyed to process.cwd()
 const other = await leasePort(3000, { cwd: "/srv" });// keyed to another dir
+const web = await leasePort(3000, { name: "web" }); // distinct lease within a dir
+const api = await leasePort(3000, { name: "api" }); // ...gets a different port
 ```
 
 ### API
@@ -54,6 +57,7 @@ const other = await leasePort(3000, { cwd: "/srv" });// keyed to another dir
 
 - `basePort` — lowest port to consider (1024–65535).
 - `options.cwd` — directory the lease is keyed to (default: `process.cwd()`).
+- `options.name` — distinguishes multiple leases sharing a `cwd` and base port, e.g. several apps in one directory. Omit for a single lease per `cwd`+base.
 - `options.logger` — function called with diagnostic strings (e.g. `console.error`).
 
 Returns the leased port.

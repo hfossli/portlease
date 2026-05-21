@@ -47,6 +47,34 @@ test("different directories get different ports", async () => {
   });
 });
 
+test("different names in the same directory get different ports", async () => {
+  await withTempEnv(async (tmp) => {
+    const dir = fs.mkdtempSync(path.join(tmp, "wt-"));
+    const web = await leasePort(3000, { cwd: dir, name: "web" });
+    const api = await leasePort(3000, { cwd: dir, name: "api" });
+    assert.notStrictEqual(web, api);
+  });
+});
+
+test("same name in the same directory gets the same port", async () => {
+  await withTempEnv(async (tmp) => {
+    const dir = fs.mkdtempSync(path.join(tmp, "wt-"));
+    const a = await leasePort(3000, { cwd: dir, name: "web" });
+    const b = await leasePort(3000, { cwd: dir, name: "web" });
+    assert.strictEqual(a, b);
+  });
+});
+
+test("a nameless lease keeps the historical cwd+base key", async () => {
+  await withTempEnv(async (tmp) => {
+    const dir = fs.mkdtempSync(path.join(tmp, "wt-"));
+    await leasePort(3000, { cwd: dir });
+    const leases = JSON.parse(fs.readFileSync(path.join(cacheDir(), "leases.json"), "utf8"));
+    const key = `${fs.realpathSync(dir)}\t3000`;
+    assert.ok(leases.leases[key], "expected the byte-identical cwd\\tbase key");
+  });
+});
+
 test("rejects out-of-range base ports", async () => {
   await withTempEnv(async () => {
     await assert.rejects(() => leasePort(80), /between 1024 and 65535/);

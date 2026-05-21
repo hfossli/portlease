@@ -4,7 +4,7 @@
 const { leasePort, prune } = require("../index.js");
 
 function usage() {
-  console.log(`portlease <base_port> [--cwd <path>]
+  console.log(`portlease <base_port> [--cwd <path>] [--name <name>]
 portlease --prune
 
 Leases a stable TCP port at or above <base_port>, keyed to a directory.
@@ -13,6 +13,8 @@ avoids ports already leased to other directories. Prints the port to stdout.
 
 Options:
   --cwd <path>   Directory the lease is keyed to (default: current directory)
+  --name <name>  Distinguishes multiple leases sharing a cwd and base port
+                 (e.g. several apps in one directory)
   --prune        Remove leases for directories that no longer exist, then exit
   -h, --help     Show this help
 
@@ -35,14 +37,18 @@ async function main() {
   }
 
   let cwd = process.cwd();
+  let name = "";
   for (let i = 1; i < args.length; i++) {
     if (args[i] === "--cwd" && args[i + 1]) {
       cwd = args[i + 1];
       i++;
+    } else if (args[i] === "--name" && args[i + 1]) {
+      name = args[i + 1];
+      i++;
     }
   }
 
-  const port = await leasePort(args[0], { cwd, logger: (m) => console.error(m) });
+  const port = await leasePort(args[0], { cwd, name, logger: (m) => console.error(m) });
   console.log(port);
 }
 

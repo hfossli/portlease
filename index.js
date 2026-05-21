@@ -137,6 +137,9 @@ function resolveCwd(cwd) {
  * @param {number} basePort  Lowest port to consider (1024-65535).
  * @param {object} [options]
  * @param {string} [options.cwd]     Directory the lease is keyed to (default: process.cwd()).
+ * @param {string} [options.name]    Distinguishes multiple leases sharing a cwd and base
+ *                                   (e.g. several apps in one directory). Omit for a single
+ *                                   lease per cwd+base.
  * @param {function} [options.logger] Called with diagnostic strings (e.g. console.error).
  * @returns {Promise<number>} The leased port.
  */
@@ -146,13 +149,17 @@ async function leasePort(basePort, options = {}) {
     throw new Error("leasePort: basePort must be an integer between 1024 and 65535");
   }
   const cwd = resolveCwd(options.cwd);
+  const name = options.name == null ? "" : String(options.name);
   const logger = options.logger;
 
   acquireLock();
   try {
     let data = pruneLeases(readLeases(), { logger });
 
-    const leaseKey = `${cwd}\t${base}`;
+    // Keep the historical `cwd\tbase` key byte-identical when no name is given,
+    // and only append a name segment for callers that need to distinguish
+    // multiple leases within the same directory.
+    const leaseKey = name ? `${cwd}\t${base}\t${name}` : `${cwd}\t${base}`;
     const existing = data.leases[leaseKey];
 
     if (existing) {
@@ -170,6 +177,7 @@ async function leasePort(basePort, options = {}) {
     data.leases[leaseKey] = {
       cwd,
       base,
+      ...(name ? { name } : {}),
       port,
       updatedAt: new Date().toISOString(),
     };
