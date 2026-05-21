@@ -1,6 +1,6 @@
 {
   "name": "portlease",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lease a stable, conflict-free TCP port per directory — usable as a CLI or a JS library.",
   "license": "MIT",
   "author": "Håvard Fossli <hfossli@gmail.com>",
@@ -25,7 +25,9 @@
   },
   "main": "index.js",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./bin/portlease.js": "./bin/portlease.js",
+    "./package.json": "./package.json"
   },
   "bin": {
     "portlease": "bin/portlease.js"
