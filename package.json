@@ -1,0 +1,42 @@
+{
+  "name": "portlease",
+  "version": "1.0.0",
+  "description": "Lease a stable, conflict-free TCP port per directory — usable as a CLI or a JS library.",
+  "license": "MIT",
+  "author": "Håvard Fossli <hfossli@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hfossli/portlease.git"
+  },
+  "homepage": "https://github.com/hfossli/portlease#readme",
+  "bugs": {
+    "url": "https://github.com/hfossli/portlease/issues"
+  },
+  "keywords": [
+    "port",
+    "lease",
+    "tcp",
+    "dev",
+    "worktree",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "bin": {
+    "portlease": "bin/portlease.js"
+  },
+  "files": [
+    "index.js",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  }
+}
