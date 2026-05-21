@@ -1,4 +1,4 @@
-# portlease
+# @hfossli/portlease
 
 Lease a stable, conflict-free TCP port for a directory. Run it twice from the
 same directory and you get the same port back (as long as it is still free);
@@ -9,11 +9,16 @@ Works as a **CLI** and as a **JS library**.
 
 ## Install
 
+Distributed via GitHub (not the npm registry):
+
 ```sh
-npm install portlease          # as a dependency
-npm install -g portlease       # as a global CLI
-npx portlease 3000             # one-off, no install
+npm install hfossli/portlease          # as a dependency
+npm install -g hfossli/portlease       # as a global CLI (installs the `portlease` bin)
+npx github:hfossli/portlease 3000      # one-off, no install
 ```
+
+Pin to a tag for reproducible installs, e.g. `npm install github:hfossli/portlease#v1.0.1`.
+The package name is `@hfossli/portlease`, so import it as such once installed.
 
 ## CLI
 
@@ -43,7 +48,7 @@ my-server --port "$PORT"
 ## Library
 
 ```js
-const { leasePort } = require("portlease");
+const { leasePort } = require("@hfossli/portlease");
 
 const port = await leasePort(3000);                 // keyed to process.cwd()
 const other = await leasePort(3000, { cwd: "/srv" });// keyed to another dir

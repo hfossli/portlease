@@ -1,8 +1,11 @@
 {
-  "name": "portlease",
+  "name": "@hfossli/portlease",
   "version": "1.0.1",
   "description": "Lease a stable, conflict-free TCP port per directory — usable as a CLI or a JS library.",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "Håvard Fossli <hfossli@gmail.com>",
   "repository": {
     "type": "git",
