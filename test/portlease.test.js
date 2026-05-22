@@ -6,8 +6,21 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
+const net = require("node:net");
 
-const { leasePort, prune, cacheDir } = require("../index.js");
+const { leasePort, prune, cacheDir, isPortFree } = require("../index.js");
+
+// Start a server listening on the given host and return { port, close }.
+function listenOn(host) {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once("error", reject);
+    srv.listen(0, host, () => {
+      const { port } = srv.address();
+      resolve({ port, close: () => new Promise((r) => srv.close(r)) });
+    });
+  });
+}
 
 async function withTempEnv(run) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "portlease-test-"));
@@ -92,6 +105,39 @@ test("prune drops leases for missing directories", async () => {
     const leases = JSON.parse(fs.readFileSync(path.join(cacheDir(), "leases.json"), "utf8"));
     assert.deepStrictEqual(leases.leases, {});
   });
+});
+
+test("isPortFree detects a server bound only to the IPv6 wildcard", async () => {
+  // Regression: an IPv4-only probe (127.0.0.1) would miss `:::PORT` listeners and
+  // wrongly report the port free. This is exactly how orphaned dev servers collide.
+  const server = await listenOn("::");
+  try {
+    assert.strictEqual(await isPortFree(server.port), false);
+  } finally {
+    await server.close();
+  }
+});
+
+test("leasePort skips a port occupied only on IPv6", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "portlease-test-"));
+  const prevCache = process.env.PORTLEASE_CACHE_DIR;
+  const prevSkip = process.env.PORTLEASE_SKIP_PORT_CHECK;
+  process.env.PORTLEASE_CACHE_DIR = path.join(tmp, "cache");
+  delete process.env.PORTLEASE_SKIP_PORT_CHECK; // exercise the real probe
+  const server = await listenOn("::");
+  try {
+    const dir = fs.mkdtempSync(path.join(tmp, "wt-"));
+    const leased = await leasePort(server.port, { cwd: dir });
+    assert.notStrictEqual(leased, server.port);
+    assert.ok(leased > server.port);
+  } finally {
+    await server.close();
+    if (prevCache === undefined) delete process.env.PORTLEASE_CACHE_DIR;
+    else process.env.PORTLEASE_CACHE_DIR = prevCache;
+    if (prevSkip === undefined) delete process.env.PORTLEASE_SKIP_PORT_CHECK;
+    else process.env.PORTLEASE_SKIP_PORT_CHECK = prevSkip;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test("CLI prints a port", async () => {

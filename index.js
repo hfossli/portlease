@@ -94,16 +94,33 @@ function pruneLeases(data, { logger } = {}) {
   return next;
 }
 
-function isPortFree(port) {
-  if (String(process.env.PORTLEASE_SKIP_PORT_CHECK || "") === "1") {
-    return Promise.resolve(true);
-  }
+// Try to bind a single host. Resolves true if the bind succeeds (port is free on
+// that stack) or the stack is unavailable on this machine (EADDRNOTAVAIL /
+// EAFNOSUPPORT — nothing can be listening there). Resolves false on EADDRINUSE.
+function canBind(port, host) {
   return new Promise((resolve) => {
     const srv = net.createServer();
-    srv.once("error", () => resolve(false));
+    srv.once("error", (err) => {
+      resolve(err && (err.code === "EADDRNOTAVAIL" || err.code === "EAFNOSUPPORT"));
+    });
     srv.once("listening", () => srv.close(() => resolve(true)));
-    srv.listen(port, "127.0.0.1");
+    srv.listen(port, host);
   });
+}
+
+// A port is free only if it is occupied on neither the IPv4 nor the IPv6 stack.
+// Checking 127.0.0.1 alone misses servers bound to the IPv6 wildcard (`:::PORT`),
+// which on macOS is a distinct bind — so an IPv4-only probe would report such a
+// port free and we would hand out a port that is actually in use.
+async function isPortFree(port) {
+  if (String(process.env.PORTLEASE_SKIP_PORT_CHECK || "") === "1") {
+    return true;
+  }
+  const [ipv4Free, ipv6Free] = await Promise.all([
+    canBind(port, "127.0.0.1"),
+    canBind(port, "::"),
+  ]);
+  return ipv4Free && ipv6Free;
 }
 
 function leasedPorts(data) {
@@ -206,4 +223,5 @@ module.exports = {
   leasePort,
   prune,
   cacheDir,
+  isPortFree,
 };
