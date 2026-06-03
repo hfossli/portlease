@@ -180,7 +180,17 @@ async function leasePort(basePort, options = {}) {
     const existing = data.leases[leaseKey];
 
     if (existing) {
-      if (await isPortFree(existing.port)) {
+      // Keep the lease whenever no *other* lease claims this port, even if the
+      // port is currently bound. The common case is that our own server is the
+      // one binding it — e.g. `dev stop` loads the config (which re-leases)
+      // before killing the running server, and we must not drop the lease out
+      // from under it. We only reassign when a different lease has taken the
+      // port (worktree collision after a crash), since that's the one case
+      // where the bind genuinely isn't ours to keep.
+      const portTakenByOther = Object.entries(data.leases).some(
+        ([key, lease]) => key !== leaseKey && lease.port === existing.port
+      );
+      if (!portTakenByOther || (await isPortFree(existing.port))) {
         existing.updatedAt = new Date().toISOString();
         writeLeases(data);
         return existing.port;

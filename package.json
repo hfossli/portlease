@@ -1,6 +1,6 @@
 {
   "name": "@hfossli/portlease",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Lease a stable, conflict-free TCP port per directory — usable as a CLI or a JS library.",
   "license": "MIT",
   "publishConfig": {

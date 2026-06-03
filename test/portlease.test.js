@@ -140,6 +140,104 @@ test("leasePort skips a port occupied only on IPv6", async () => {
   }
 });
 
+test("re-leasing while our own server holds the port keeps the lease", async () => {
+  // Regression: every `dev` subcommand loads dev.config.js (which re-leases)
+  // before dispatching. On `dev stop`, the re-lease runs while our server is
+  // still bound to its port — if leasePort treated that as "port stolen" it
+  // would drop the lease and the next `dev start` would pick a fresh port.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "portlease-test-"));
+  const prevCache = process.env.PORTLEASE_CACHE_DIR;
+  const prevSkip = process.env.PORTLEASE_SKIP_PORT_CHECK;
+  process.env.PORTLEASE_CACHE_DIR = path.join(tmp, "cache");
+  delete process.env.PORTLEASE_SKIP_PORT_CHECK; // exercise the real probe
+  let server;
+  try {
+    server = await listenOn("::");
+    const dir = fs.mkdtempSync(path.join(tmp, "wt-"));
+    // Seed a lease for `dir` at exactly the port our "server" is bound to,
+    // so the re-lease below has to decide what to do about a bound port.
+    const leasesFile = path.join(tmp, "cache", "leases.json");
+    fs.mkdirSync(path.dirname(leasesFile), { recursive: true });
+    const realDir = fs.realpathSync(dir);
+    fs.writeFileSync(
+      leasesFile,
+      JSON.stringify({
+        leases: {
+          [`${realDir}\t${server.port}`]: {
+            cwd: realDir,
+            base: server.port,
+            port: server.port,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      }) + "\n"
+    );
+    // Re-leasing from `dir` must return the same port, not a fresh one,
+    // because the existing lease's port — though bound — isn't claimed by
+    // any *other* lease in the table.
+    const second = await leasePort(server.port, { cwd: dir });
+    assert.strictEqual(second, server.port);
+  } finally {
+    if (server) await server.close();
+    if (prevCache === undefined) delete process.env.PORTLEASE_CACHE_DIR;
+    else process.env.PORTLEASE_CACHE_DIR = prevCache;
+    if (prevSkip === undefined) delete process.env.PORTLEASE_SKIP_PORT_CHECK;
+    else process.env.PORTLEASE_SKIP_PORT_CHECK = prevSkip;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("re-leasing reassigns when another lease has taken our port", async () => {
+  // The flip side of the regression above: if a *different* lease has stolen
+  // our port (and that port is actually bound), we must reassign so the two
+  // don't collide.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "portlease-test-"));
+  const prevCache = process.env.PORTLEASE_CACHE_DIR;
+  const prevSkip = process.env.PORTLEASE_SKIP_PORT_CHECK;
+  process.env.PORTLEASE_CACHE_DIR = path.join(tmp, "cache");
+  delete process.env.PORTLEASE_SKIP_PORT_CHECK; // exercise the real probe
+  let server;
+  try {
+    server = await listenOn("::");
+    const d1 = fs.mkdtempSync(path.join(tmp, "wt1-"));
+    const d2 = fs.mkdtempSync(path.join(tmp, "wt2-"));
+    // Seed two leases that both claim the bound port — d1's original, plus
+    // a sibling d2 that has "stolen" it.
+    const leasesFile = path.join(tmp, "cache", "leases.json");
+    fs.mkdirSync(path.dirname(leasesFile), { recursive: true });
+    const real1 = fs.realpathSync(d1);
+    const real2 = fs.realpathSync(d2);
+    fs.writeFileSync(
+      leasesFile,
+      JSON.stringify({
+        leases: {
+          [`${real1}\t${server.port}`]: {
+            cwd: real1,
+            base: server.port,
+            port: server.port,
+            updatedAt: new Date().toISOString(),
+          },
+          [`${real2}\t${server.port}`]: {
+            cwd: real2,
+            base: server.port,
+            port: server.port,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      }) + "\n"
+    );
+    const reassigned = await leasePort(server.port, { cwd: d1 });
+    assert.notStrictEqual(reassigned, server.port);
+  } finally {
+    if (server) await server.close();
+    if (prevCache === undefined) delete process.env.PORTLEASE_CACHE_DIR;
+    else process.env.PORTLEASE_CACHE_DIR = prevCache;
+    if (prevSkip === undefined) delete process.env.PORTLEASE_SKIP_PORT_CHECK;
+    else process.env.PORTLEASE_SKIP_PORT_CHECK = prevSkip;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test("CLI prints a port", async () => {
   await withTempEnv((tmp) => {
     const dir = fs.mkdtempSync(path.join(tmp, "wt-"));
