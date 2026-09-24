@@ -112,15 +112,16 @@ function canBind(port, host) {
 // Checking 127.0.0.1 alone misses servers bound to the IPv6 wildcard (`:::PORT`),
 // which on macOS is a distinct bind — so an IPv4-only probe would report such a
 // port free and we would hand out a port that is actually in use.
+//
+// The probes must run one after the other, never concurrently. On Linux (with
+// the default net.ipv6.bindv6only=0) a `::` bind is dual-stack and also claims
+// the IPv4 side, so two simultaneous probes collide with *each other* and every
+// port looks busy.
 async function isPortFree(port) {
   if (String(process.env.PORTLEASE_SKIP_PORT_CHECK || "") === "1") {
     return true;
   }
-  const [ipv4Free, ipv6Free] = await Promise.all([
-    canBind(port, "127.0.0.1"),
-    canBind(port, "::"),
-  ]);
-  return ipv4Free && ipv6Free;
+  return (await canBind(port, "127.0.0.1")) && (await canBind(port, "::"));
 }
 
 function leasedPorts(data) {

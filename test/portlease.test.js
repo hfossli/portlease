@@ -107,6 +107,14 @@ test("prune drops leases for missing directories", async () => {
   });
 });
 
+test("isPortFree reports a free port as free", async () => {
+  // Regression: probing 127.0.0.1 and :: concurrently made the probes collide on
+  // Linux (a dual-stack `::` bind also claims IPv4), so every port looked busy.
+  const probe = await listenOn("127.0.0.1");
+  await probe.close();
+  assert.strictEqual(await isPortFree(probe.port), true);
+});
+
 test("isPortFree detects a server bound only to the IPv6 wildcard", async () => {
   // Regression: an IPv4-only probe (127.0.0.1) would miss `:::PORT` listeners and
   // wrongly report the port free. This is exactly how orphaned dev servers collide.
